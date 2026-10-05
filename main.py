@@ -1,34 +1,35 @@
+import random
 import statistics
 
-from batalhas import algoritmo_genetico, hill_climbing, simulated_annealing
-from mapa import carregar_mapa
-from rota import gerar_matriz_distancias, reconstruir_rota_completa
+from batalhas import algoritmo_genetico, simulated_annealing, hill_climbing
+from batalhas import calcular_energia, calcular_tempo_batalha, solucao_valida
+from mapa import DIFICULDADE_GINASIOS, carregar_mapa
+from rota import a_estrela_ginasios, gerar_matriz_distancias, reconstruir_rota_completa
 
 
 def encontrar_inicio_e_destino(mapa):
     inicio = None
     destino = None
 
-    for i, linha in enumerate(mapa):
-        for j, celula in enumerate(linha):
-            if celula == '1':
+    for i in range(len(mapa)):
+        for j in range(len(mapa[i])):
+            if mapa[i][j] == '1':
                 inicio = (i, j)
-            elif celula == 'U':
+            elif mapa[i][j] == 'U':
                 destino = (i, j)
 
     return inicio, destino
 
 
-def executar_experimentos(funcao, ginasios, custos, execucoes=30, **parametros):
+def executar_experimentos(algoritmo, ginasios, execucoes=30):
     resultados = []
     melhor_solucao = None
     melhor_custo = float('inf')
-    melhor_energia = None
 
     for _ in range(execucoes):
-        solucao, custo, energia = funcao(ginasios, custos, **parametros)
+        solucao, custo = algoritmo(ginasios)
 
-        if custo == float('inf'):
+        if not solucao_valida(solucao):
             continue
 
         resultados.append(custo)
@@ -36,19 +37,47 @@ def executar_experimentos(funcao, ginasios, custos, execucoes=30, **parametros):
         if custo < melhor_custo:
             melhor_custo = custo
             melhor_solucao = solucao
-            melhor_energia = energia
 
-    if not resultados:
-        return None, float('inf'), 0, 0, None
+    if len(resultados) == 0:
+        return None, float('inf')
 
     media = statistics.mean(resultados)
-    desvio = statistics.stdev(resultados) if len(resultados) > 1 else 0.0
+    if len(resultados) > 1:
+        desvio = statistics.stdev(resultados)
+    else:
+        desvio = 0.0
 
-    return melhor_solucao, melhor_custo, media, desvio, melhor_energia
+    print(f"Execuções: {execucoes} | Válidas: {len(resultados)} | Melhor: {melhor_custo:.3f} | "
+          f"Média: {media:.3f} | Desvio: {desvio:.3f}")
+
+    return melhor_solucao, melhor_custo
+
+
+def mostrar_percurso(ordem, custos, equipes):
+    pontos = ['1'] + ordem + ['U']
+    custo_rota = 0
+    custo_batalhas = 0
+
+    print("\nPercurso do agente:")
+    for i in range(1, len(pontos)):
+        anterior = pontos[i - 1]
+        ponto = pontos[i]
+        custo_rota += custos[(anterior, ponto)]
+
+        if ponto == 'U':
+            print(f"  Chegou em U    | rota: {custo_rota:5} | batalhas: {custo_batalhas:8.3f}")
+        else:
+            custo_batalhas += calcular_tempo_batalha(DIFICULDADE_GINASIOS[ponto], equipes[ponto])
+            print(f"  Ginásio {ponto:<6} | rota: {custo_rota:5} | batalhas: {custo_batalhas:8.3f} "
+                  f"| equipe: {', '.join(equipes[ponto])}")
+
+    return custo_rota, custo_batalhas
 
 
 def main():
-    with open("mapa.txt", "r") as arquivo:
+    random.seed(42)
+
+    with open("mapa.txt", "r", encoding="utf-8") as arquivo:
         mapa = carregar_mapa(arquivo.read())
 
     inicio, destino = encontrar_inicio_e_destino(mapa)
@@ -57,55 +86,54 @@ def main():
         print("Erro: origem (1) ou destino (U) não encontrados no mapa.")
         return
 
-    print("Pré-calculando distâncias com Dijkstra...")
     custos, caminhos, ginasios = gerar_matriz_distancias(mapa, inicio, destino)
 
-    print("\nOtimizando rota e batalhas...")
-    testes = 100
+    print("\nBuscando a melhor ordem dos ginásios com A* : ")
+    ordem, custo_rota, expandidos = a_estrela_ginasios(ginasios, custos)
+    print(f"Custo da rota: {custo_rota} | Estados expandidos pelo A*: {expandidos}")
 
-    print("\nExecutando Hill Climbing...")
-    solucao_hc, custo_hc, media_hc, desvio_hc, energia_hc = executar_experimentos(
-        hill_climbing, ginasios, custos, testes, iteracoes=1000
-    )
-    print(f"Testes: {testes} | Média: {media_hc:.2f} | Desvio: {desvio_hc:.2f} | "
-          f"Melhor Custo: {custo_hc:.2f}")
+    rota_completa = reconstruir_rota_completa(ordem, caminhos)
+
+    testes = 30
+
+    print("\nHill Climbing : ")
+    solucao_hc, custo_hc = executar_experimentos(hill_climbing, ginasios, testes)
 
     print("\nExecutando Simulated Annealing...")
-    solucao_sa, custo_sa, media_sa, desvio_sa, energia_sa = executar_experimentos(
-        simulated_annealing, ginasios, custos, testes, iteracoes=1000
-    )
-    print(f"Testes: {testes} | Média: {media_sa:.2f} | Desvio: {desvio_sa:.2f} | "
-          f"Melhor Custo: {custo_sa:.2f}")
+    solucao_sa, custo_sa = executar_experimentos(simulated_annealing, ginasios, testes)
 
     print("\nExecutando Algoritmo Genético...")
-    solucao_ag, custo_ag, media_ag, desvio_ag, energia_ag = executar_experimentos(
-        algoritmo_genetico, ginasios, custos, testes, geracoes=50
-    )
-    print(f"Testes: {testes} | Média: {media_ag:.2f} | Desvio: {desvio_ag:.2f} | "
-          f"Melhor Custo: {custo_ag:.2f}")
+    solucao_ag, custo_ag = executar_experimentos(algoritmo_genetico, ginasios, testes)
 
-    resultados = [
-        ("Hill Climbing", solucao_hc, custo_hc, energia_hc),
-        ("Simulated Annealing", solucao_sa, custo_sa, energia_sa),
-        ("Algoritmo Genético", solucao_ag, custo_ag, energia_ag)
-    ]
+    nome = "Hill Climbing"
+    equipes = solucao_hc
+    custo_batalhas = custo_hc
 
-    melhor = resultados[0]
+    if custo_sa < custo_batalhas:
+        nome = "Simulated Annealing"
+        equipes = solucao_sa
+        custo_batalhas = custo_sa
 
-    for resultado in resultados[1:]:
-        if resultado[2] < melhor[2]:
-            melhor = resultado
+    if custo_ag < custo_batalhas:
+        nome = "Algoritmo Genético"
+        equipes = solucao_ag
+        custo_batalhas = custo_ag
 
-    nome, solucao, custo, energia = melhor
-    ordem, equipes = solucao
+    custo_rota, custo_batalhas = mostrar_percurso(ordem, custos, equipes)
 
-    reconstruir_rota_completa(ordem, caminhos)
+    print("\n===== RESULTADO FINAL =====")
+    print(f"Melhor algoritmo nas batalhas: {nome}")
+    print(f"Ordem de visita aos ginásios: {' -> '.join(ordem)}")
+    print(f"Pokémon usados em cada batalha:")
+    for ginasio in ordem:
+        print(f"  {ginasio}: {', '.join(equipes[ginasio])}")
+    print(f"Energia final de cada Pokémon: {calcular_energia(equipes)}")
+    print(f"Estados expandidos pelo A*: {expandidos}")
+    print(f"Passos no mapa: {len(rota_completa) - 1}")
+    print(f"Custo da rota (C_rota): {custo_rota} minutos")
+    print(f"Custo das batalhas (C_batalhas): {custo_batalhas:.3f} minutos")
+    print(f"Custo total (C_total): {custo_rota + custo_batalhas:.3f} minutos")
 
-    print(f"Melhor Algoritmo Unificado: {nome}")
-    print(f"Ordem de visita aos ginásios: {ordem}")
-    print(f"Pokémon usados em cada batalha: {equipes}")
-    print(f"Energia final de cada Pokémon: {energia}")
-    print(f"Custo Total (C_total): {custo:.2f} minutos")
-    
+
 if __name__ == "__main__":
     main()
