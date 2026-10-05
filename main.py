@@ -99,10 +99,10 @@ def main():
     print("\nHill Climbing : ")
     solucao_hc, custo_hc = executar_experimentos(hill_climbing, ginasios, testes)
 
-    print("\nExecutando Simulated Annealing...")
+    print("\nSimulated Annealing:")
     solucao_sa, custo_sa = executar_experimentos(simulated_annealing, ginasios, testes)
 
-    print("\nExecutando Algoritmo Genético...")
+    print("\nAlgoritmo Genético: ")
     solucao_ag, custo_ag = executar_experimentos(algoritmo_genetico, ginasios, testes)
 
     nome = "Hill Climbing"
@@ -121,13 +121,13 @@ def main():
 
     custo_rota, custo_batalhas = mostrar_percurso(ordem, custos, equipes)
 
-    print("\n===== RESULTADO FINAL =====")
+    print("\n RESULTADO: ")
     print(f"Melhor algoritmo nas batalhas: {nome}")
     print(f"Ordem de visita aos ginásios: {' -> '.join(ordem)}")
-    print(f"Pokémon usados em cada batalha:")
+    print(f"Pokemon usados em cada batalha:")
     for ginasio in ordem:
-        print(f"  {ginasio}: {', '.join(equipes[ginasio])}")
-    print(f"Energia final de cada Pokémon: {calcular_energia(equipes)}")
+        print(f" {ginasio}: {', '.join(equipes[ginasio])}")
+    print(f"Energia final de cada Pokemon: {calcular_energia(equipes)}")
     print(f"Estados expandidos pelo A*: {expandidos}")
     print(f"Passos no mapa: {len(rota_completa) - 1}")
     print(f"Custo da rota (C_rota): {custo_rota} minutos")
