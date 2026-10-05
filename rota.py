@@ -90,7 +90,7 @@ def gerar_matriz_distancias(mapa, inicio, destino):
     custos = {}
     caminhos = {}
 
-    print(f"Calculando distâncias entre {len(pontos)} pontos com A*...")
+    print("Calculando distâncias entre", len(pontos), "pontos com A* ")
 
     for i in range(len(nomes)):
         for j in range(i + 1, len(nomes)):

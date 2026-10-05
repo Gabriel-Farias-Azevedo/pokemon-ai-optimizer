@@ -47,8 +47,8 @@ def executar_experimentos(algoritmo, ginasios, execucoes=30):
     else:
         desvio = 0.0
 
-    print(f"Execuções: {execucoes} | Válidas: {len(resultados)} | Melhor: {melhor_custo:.3f} | "
-          f"Média: {media:.3f} | Desvio: {desvio:.3f}")
+    print("Execuções:", execucoes, "| Válidas:", len(resultados), "| Melhor:", round(melhor_custo, 3),
+          "| Média:", round(media, 3), "| Desvio:", round(desvio, 3))
 
     return melhor_solucao, melhor_custo
 
@@ -65,11 +65,11 @@ def mostrar_percurso(ordem, custos, equipes):
         custo_rota += custos[(anterior, ponto)]
 
         if ponto == 'U':
-            print(f"  Chegou em U    | rota: {custo_rota:5} | batalhas: {custo_batalhas:8.3f}")
+            print("  Chegou em U | rota:", custo_rota, "| batalhas:", round(custo_batalhas, 3))
         else:
             custo_batalhas += calcular_tempo_batalha(DIFICULDADE_GINASIOS[ponto], equipes[ponto])
-            print(f"  Ginásio {ponto:<6} | rota: {custo_rota:5} | batalhas: {custo_batalhas:8.3f} "
-                  f"| equipe: {', '.join(equipes[ponto])}")
+            print("  Ginásio", ponto, "| rota:", custo_rota, "| batalhas:", round(custo_batalhas, 3),
+                  "| equipe:", ", ".join(equipes[ponto]))
 
     return custo_rota, custo_batalhas
 
@@ -90,7 +90,7 @@ def main():
 
     print("\nBuscando a melhor ordem dos ginásios com A* : ")
     ordem, custo_rota, expandidos = a_estrela_ginasios(ginasios, custos)
-    print(f"Custo da rota: {custo_rota} | Estados expandidos pelo A*: {expandidos}")
+    print("Custo da rota:", custo_rota, "| Estados expandidos pelo A*:", expandidos)
 
     rota_completa = reconstruir_rota_completa(ordem, caminhos)
 
@@ -122,17 +122,17 @@ def main():
     custo_rota, custo_batalhas = mostrar_percurso(ordem, custos, equipes)
 
     print("\n RESULTADO: ")
-    print(f"Melhor algoritmo nas batalhas: {nome}")
-    print(f"Ordem de visita aos ginásios: {' -> '.join(ordem)}")
-    print(f"Pokemon usados em cada batalha:")
+    print("Melhor algoritmo nas batalhas:", nome)
+    print("Ordem de visita aos ginásios:", " -> ".join(ordem))
+    print("Pokemon usados em cada batalha:")
     for ginasio in ordem:
-        print(f" {ginasio}: {', '.join(equipes[ginasio])}")
-    print(f"Energia final de cada Pokemon: {calcular_energia(equipes)}")
-    print(f"Estados expandidos pelo A*: {expandidos}")
-    print(f"Passos no mapa: {len(rota_completa) - 1}")
-    print(f"Custo da rota (C_rota): {custo_rota} minutos")
-    print(f"Custo das batalhas (C_batalhas): {custo_batalhas:.3f} minutos")
-    print(f"Custo total (C_total): {custo_rota + custo_batalhas:.3f} minutos")
+        print(" " + ginasio + ":", ", ".join(equipes[ginasio]))
+    print("Energia final de cada Pokemon:", calcular_energia(equipes))
+    print("Estados expandidos pelo A*:", expandidos)
+    print("Passos no mapa:", len(rota_completa) - 1)
+    print("Custo da rota (C_rota):", custo_rota, "minutos")
+    print("Custo das batalhas (C_batalhas):", round(custo_batalhas, 3), "minutos")
+    print("Custo total (C_total):", round(custo_rota + custo_batalhas, 3), "minutos")
 
 
 if __name__ == "__main__":
