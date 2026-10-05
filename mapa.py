@@ -1,11 +1,6 @@
 CUSTOS_TERRENO = {
-    'M': 200, 
-    'A': 30,  
-    'F': 15,  
-    'R': 5,   
-    '.': 1,   
-    '1': 1,   
-    'U': 1    
+    'M': 200, 'A': 30, 'F': 15, 'R': 5,
+    '.': 1, '1': 1, 'U': 1
 }
 
 DIFICULDADE_GINASIOS = {
@@ -22,25 +17,20 @@ POKEMONS = {
     'Weedle': {'poder': 1.1, 'energia': 6}
 }
 
-# Transforma o texto gigante do mapa em uma matriz (lista de listas) para facilitar o acesso
-def carregar_mapa(string_mapa):
-    linhas_texto = string_mapa.strip().split('\n')
-    matriz_mapa = []
-    
-    for linha in linhas_texto:
-        caracteres_da_linha = list(linha)
-        matriz_mapa.append(caracteres_da_linha)
-        
-    return matriz_mapa
 
-# Devolve o custo de tempo para pisar em uma celula especifica do mapa.
-# Se for um ginasio, o custo de movimento é livre (1), pois o tempo da batalha é somado depois.
+def carregar_mapa(string_mapa):
+    linhas = string_mapa.strip().splitlines()
+    mapa = []
+
+    for linha in linhas:
+        mapa.append(list(linha))
+
+    return mapa
+
+
 def obter_custo_movimento(celula):
     if celula in CUSTOS_TERRENO:
-        custo = CUSTOS_TERRENO[celula]
-        return custo
-    elif celula in DIFICULDADE_GINASIOS:
-        return 1
-    else:
-        # Custo padrao caso venha algum caractere estranho
-        return 1
+        return CUSTOS_TERRENO[celula]
+
+    return 1
+

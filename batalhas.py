@@ -1,204 +1,187 @@
-import random
-import math
 import copy
-from mapa import POKEMONS, DIFICULDADE_GINASIOS
+import math
+import random
 
-# Calcula o tempo gasto em um ginasio dividindo a dificuldade pelo poder total
-def calcular_tempo_batalha(dificuldade, equipa_selecionada):
-    if len(equipa_selecionada) == 0:
+from mapa import DIFICULDADE_GINASIOS, POKEMONS
+
+def calcular_tempo_batalha(dificuldade, equipe):
+    if not equipe:
         return float('inf')
-    
-    poder_total = 0.0
-    for pokemon in equipa_selecionada:
-        poder_total += POKEMONS[pokemon]['poder']
-        
-    tempo = dificuldade / poder_total
-    return tempo
 
-# Calcula o custo total das batalhas e verifica se as regras de energia foram quebradas
-def avaliar_solucao(solucao, ordem_ginasios):
-    energia_atual = {}
-    for p in POKEMONS:
-        energia_atual[p] = POKEMONS[p]['energia']
-        
-    tempo_total = 0.0
-    
-    for ginasio in ordem_ginasios:
-        equipe = solucao[ginasio]
-        dificuldade = DIFICULDADE_GINASIOS[ginasio]
-        
-        tempo_batalha = calcular_tempo_batalha(dificuldade, equipe)
-        tempo_total += tempo_batalha
-        
+    poder = sum(POKEMONS[pokemon]['poder'] for pokemon in equipe)
+    return dificuldade / poder
+
+
+def avaliar_solucao(individuo, tabela_custos):
+    ordem, equipes = individuo
+    energia = {pokemon: dados['energia'] for pokemon, dados in POKEMONS.items()}
+    tempo_rota = 0
+    tempo_batalhas = 0
+
+    pontos = ['1'] + ordem + ['U']
+
+    for i in range(len(pontos) - 1):
+        origem, destino = pontos[i], pontos[i + 1]
+        tempo_rota += tabela_custos.get((origem, destino), float('inf'))
+
+    for ginasio in ordem:
+        equipe = equipes[ginasio]
+        tempo_batalhas += calcular_tempo_batalha(DIFICULDADE_GINASIOS[ginasio], equipe)
+
         for pokemon in equipe:
-            energia_atual[pokemon] -= 1
-            # Se algum pokemon ficar com energia negativa, a solucao e invalida
-            if energia_atual[pokemon] < 0:
-                return float('inf'), energia_atual
-                
-    # Checa se sobrou pelo menos um pokemon com energia >= 1 no final do trajeto
-    maior_energia = max(energia_atual.values())
-    if maior_energia < 1:
-        return float('inf'), energia_atual
-        
-    return tempo_total, energia_atual
+            energia[pokemon] -= 1
+            if energia[pokemon] < 0:
+                return float('inf'), energia
 
-# Modifica a equipe de um ginasio escolhido de forma aleatoria para gerar um vizinho
-def gerar_vizinho(solucao_atual):
-    novo_vizinho = copy.deepcopy(solucao_atual)
-    
-    lista_ginasios = list(novo_vizinho.keys())
-    ginasio_aleatorio = random.choice(lista_ginasios)
-    
-    todos_pokemons = list(POKEMONS.keys())
-    tamanho_equipe = random.randint(1, len(todos_pokemons))
-    nova_equipe = random.sample(todos_pokemons, tamanho_equipe)
-    
-    novo_vizinho[ginasio_aleatorio] = nova_equipe
-    
-    return novo_vizinho
+    if max(energia.values()) < 1:
+        return float('inf'), energia
 
-# Otimiza as equipes usando o algoritmo de Hill Climbing
-def hill_climbing(ordem_ginasios, iteracoes=1000):
-    # Gera uma solucao inicial aleatoria
-    solucao_atual = {}
-    for ginasio in ordem_ginasios:
-        qtd_pokemons = random.randint(1, 3)
-        solucao_atual[ginasio] = random.sample(list(POKEMONS.keys()), qtd_pokemons)
-        
-    custo_atual, _ = avaliar_solucao(solucao_atual, ordem_ginasios)
-    
-    for i in range(iteracoes):
-        vizinho = gerar_vizinho(solucao_atual)
-        custo_vizinho, _ = avaliar_solucao(vizinho, ordem_ginasios)
-        
-        # Aceita a mudanca apenas se o custo for menor
+    return tempo_rota + tempo_batalhas, energia
+
+
+def gerar_vizinho(individuo):
+    ordem, equipes = copy.deepcopy(individuo)
+
+    if random.random() < 0.5 and len(ordem) > 1:
+        i, j = random.sample(range(len(ordem)), 2)
+        ordem[i], ordem[j] = ordem[j], ordem[i]
+    else:
+        ginasio = random.choice(ordem)
+        quantidade = random.randint(1, min(2, len(POKEMONS)))
+        equipes[ginasio] = random.sample(list(POKEMONS), quantidade)
+
+    return ordem, equipes
+
+
+def gerar_individuo_aleatorio(ginasios):
+    ordem = ginasios.copy()
+    random.shuffle(ordem)
+
+    equipes = {
+        ginasio: random.sample(list(POKEMONS), 1)
+        for ginasio in ordem
+    }
+
+    return ordem, equipes
+
+
+def hill_climbing(ginasios, tabela_custos, iteracoes=3000):
+    atual = gerar_individuo_aleatorio(ginasios)
+    custo_atual, _ = avaliar_solucao(atual, tabela_custos)
+
+    for _ in range(iteracoes):
+        vizinho = gerar_vizinho(atual)
+        custo_vizinho, _ = avaliar_solucao(vizinho, tabela_custos)
+
         if custo_vizinho < custo_atual:
-            solucao_atual = vizinho
+            atual = vizinho
             custo_atual = custo_vizinho
-            
-    _, energia_final = avaliar_solucao(solucao_atual, ordem_ginasios)
-    return solucao_atual, custo_atual, energia_final
 
-# Otimiza as equipes usando o algoritmo de Simulated Annealing
-def simulated_annealing(ordem_ginasios, temp_inicial=1000.0, taxa_arrefecimento=0.95, iteracoes=1000):
-    solucao_atual = {}
-    for ginasio in ordem_ginasios:
-        qtd_pokemons = random.randint(1, 3)
-        solucao_atual[ginasio] = random.sample(list(POKEMONS.keys()), qtd_pokemons)
-        
-    custo_atual, _ = avaliar_solucao(solucao_atual, ordem_ginasios)
-    
-    melhor_solucao = copy.deepcopy(solucao_atual)
+    _, energia = avaliar_solucao(atual, tabela_custos)
+    return atual, custo_atual, energia
+
+
+def simulated_annealing(ginasios, tabela_custos, temp_inicial=2000.0, taxa_arrefecimento=0.98, iteracoes=3000):
+    atual = gerar_individuo_aleatorio(ginasios)
+    custo_atual, _ = avaliar_solucao(atual, tabela_custos)
+
+    melhor = copy.deepcopy(atual)
     melhor_custo = custo_atual
     temperatura = temp_inicial
-    
-    for i in range(iteracoes):
-        vizinho = gerar_vizinho(solucao_atual)
-        custo_vizinho, _ = avaliar_solucao(vizinho, ordem_ginasios)
-        
-        delta_custo = custo_vizinho - custo_atual
-        
-        # Aceita se for melhor, ou se a probabilidade da temperatura permitir
-        if delta_custo < 0:
-            aceitar = True
-        else:
-            if temperatura > 0:
-                probabilidade = math.exp(-delta_custo / temperatura)
-                aceitar = random.random() < probabilidade
-            else:
-                aceitar = False
-                
-        if aceitar:
-            solucao_atual = copy.deepcopy(vizinho)
+
+    for _ in range(iteracoes):
+        vizinho = gerar_vizinho(atual)
+        custo_vizinho, _ = avaliar_solucao(vizinho, tabela_custos)
+        diferenca = custo_vizinho - custo_atual
+
+        aceita = diferenca < 0
+        if not aceita and temperatura > 0:
+            aceita = random.random() < math.exp(-diferenca / temperatura)
+
+        if aceita:
+            atual = copy.deepcopy(vizinho)
             custo_atual = custo_vizinho
-            
+
             if custo_atual < melhor_custo:
-                melhor_solucao = copy.deepcopy(solucao_atual)
+                melhor = copy.deepcopy(atual)
                 melhor_custo = custo_atual
-                
-        temperatura = temperatura * taxa_arrefecimento
-        
-    _, energia_final = avaliar_solucao(melhor_solucao, ordem_ginasios)
-    return melhor_solucao, melhor_custo, energia_final
 
-# Operador de cruzamento (crossover) para o Algoritmo Genetico
-def cruzar(pai1, pai2, ordem_ginasios):
-    filho = {}
-    ponto_corte = random.randint(1, len(ordem_ginasios) - 1)
-    
-    for i in range(len(ordem_ginasios)):
-        ginasio = ordem_ginasios[i]
-        if i < ponto_corte:
-            filho[ginasio] = pai1[ginasio]
+        temperatura *= taxa_arrefecimento
+
+    _, energia = avaliar_solucao(melhor, tabela_custos)
+    return melhor, melhor_custo, energia
+
+
+def cruzar(pai1, pai2):
+    ordem1, equipes1 = pai1
+    ordem2, equipes2 = pai2
+    tamanho = len(ordem1)
+
+    inicio, fim = sorted(random.sample(range(tamanho), 2))
+    nova_ordem = [None] * tamanho
+    nova_ordem[inicio:fim] = ordem1[inicio:fim]
+
+    posicao = 0
+    for i in range(tamanho):
+        if nova_ordem[i] is None:
+            while ordem2[posicao] in nova_ordem:
+                posicao += 1
+            nova_ordem[i] = ordem2[posicao]
+
+    novas_equipes = {}
+    for ginasio in nova_ordem:
+        if random.random() < 0.5:
+            novas_equipes[ginasio] = equipes1[ginasio]
         else:
-            filho[ginasio] = pai2[ginasio]
-            
-    return filho
+            novas_equipes[ginasio] = equipes2[ginasio]
 
-# Operador de mutacao para o Algoritmo Genetico
-def mutar(solucao, taxa_mutacao=0.1):
-    chance = random.random()
-    if chance < taxa_mutacao:
+    return nova_ordem, novas_equipes
+
+
+def mutar(solucao, taxa=0.2):
+    if random.random() < taxa:
         return gerar_vizinho(solucao)
-    else:
-        return solucao
+    return solucao
 
-# Otimiza as equipes usando Algoritmo Genetico
-def algoritmo_genetico(ordem_ginasios, tam_populacao=50, geracoes=100):
-    # Cria a populacao inicial
-    populacao = []
-    for _ in range(tam_populacao):
-        individuo = {}
-        for ginasio in ordem_ginasios:
-            qtd_pokemons = random.randint(1, 3)
-            individuo[ginasio] = random.sample(list(POKEMONS.keys()), qtd_pokemons)
-        populacao.append(individuo)
-        
-    avaliacoes = []
-    
-    for geracao in range(geracoes):
-        # Avalia todo mundo da populacao
-        avaliacoes = []
+
+def algoritmo_genetico(ginasios, tabela_custos, tam_populacao=100, geracoes=200):
+    populacao = [
+        gerar_individuo_aleatorio(ginasios)
+        for _ in range(tam_populacao)
+    ]
+
+    for _ in range(geracoes):
+        avaliados = []
+
         for individuo in populacao:
-            custo, _ = avaliar_solucao(individuo, ordem_ginasios)
-            avaliacoes.append((individuo, custo))
-            
-        # Remove os invalidos e ordena do menor custo para o maior
-        avaliacoes_validas = []
-        for ind, custo in avaliacoes:
+            custo, _ = avaliar_solucao(individuo, tabela_custos)
             if custo != float('inf'):
-                avaliacoes_validas.append((ind, custo))
-                
-        avaliacoes = sorted(avaliacoes_validas, key=lambda x: x[1])
-        
-        # Se todo mundo for invalido, usa o hill climbing como seguranca
-        if len(avaliacoes) == 0:
-             return hill_climbing(ordem_ginasios)
-             
-        # Separa a elite (metade melhor)
-        metade = tam_populacao // 2
-        elite = []
-        for i in range(min(metade, len(avaliacoes))):
-            elite.append(avaliacoes[i][0])
-            
+                avaliados.append((individuo, custo))
+
+        if not avaliados:
+            return hill_climbing(ginasios, tabela_custos)
+
+        avaliados.sort(key=lambda item: item[1])
+        elite = [individuo for individuo, _ in avaliados[:tam_populacao // 2]]
         nova_populacao = copy.deepcopy(elite)
-        
-        # Completa o resto da populacao com filhos da elite
+
         while len(nova_populacao) < tam_populacao:
             pai1 = random.choice(elite)
             pai2 = random.choice(elite)
-            
-            filho = cruzar(pai1, pai2, ordem_ginasios)
-            filho_mutado = mutar(filho)
-            
-            nova_populacao.append(filho_mutado)
-            
+            filho = mutar(cruzar(pai1, pai2))
+            nova_populacao.append(filho)
+
         populacao = nova_populacao
 
-    # Pega o melhor de todos no final
-    melhor_individuo = avaliacoes[0][0]
-    melhor_custo = avaliacoes[0][1]
-    _, energia_final = avaliar_solucao(melhor_individuo, ordem_ginasios)
-    
-    return melhor_individuo, melhor_custo, energia_final
+    avaliados = [
+        (individuo, avaliar_solucao(individuo, tabela_custos)[0])
+        for individuo in populacao
+    ]
+    avaliados.sort(key=lambda item: item[1])
+
+    melhor, custo = avaliados[0]
+    _, energia = avaliar_solucao(melhor, tabela_custos)
+
+    return melhor, custo, energia
+
+
